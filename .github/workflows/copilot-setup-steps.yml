@@ -19,19 +19,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup language runtime
-        run: |
-          # Replace with runtime setup (e.g., setup-node, setup-python)
-          # Or remove this step if no runtime setup is needed
-          echo "Replace with language runtime setup or remove step"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
-          # Replace with install step from AGENTS.md
-          echo "Replace with your install step"
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
 
       - name: Validate environment
         run: |
-          # Replace with build + lint + test steps from AGENTS.md
-          echo "Replace with your build step"
-          echo "Replace with your lint step"
-          echo "Replace with your test step"
+          ruff check .
+          pytest

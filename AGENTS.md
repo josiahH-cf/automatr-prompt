@@ -38,6 +38,8 @@
 # Testing
 
 - Write tests before implementation
+- Place tests under `/tests/` using `test_*.py` naming
+- For UI behavior, use `pytest-qt` and prefer deterministic widget-level tests over timing-dependent flows
 - Each acceptance criterion requires at least one test
 - Do not modify existing tests to accommodate new code — fix the implementation
 - Run the full test suite before committing
@@ -49,6 +51,7 @@
 - Plans go in `/tasks/[feature-name].md` or as an ExecPlan per `/.codex/PLANS.md`
 - Plans are living documents — update progress, decisions, and surprises as work proceeds
 - A plan that cannot fit in 5 tasks indicates the feature should be split. Call this out.
+- Small-fix fast path: if a change is <= 3 files and has no behavior change, a full spec/task lifecycle is optional; still document intent in the PR and run lint + relevant tests.
 
 # Dependencies
 
