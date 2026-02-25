@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Iterator
+from typing import Any, Dict, List, Optional
 
 from automatr.core.config import get_templates_dir, get_config
 
@@ -538,16 +538,6 @@ class TemplateManager:
         
         self.save(template)
         return template
-    
-    def iter_with_triggers(self) -> Iterator[Template]:
-        """Iterate over templates that have Espanso triggers.
-        
-        Yields:
-            Templates with non-empty trigger field.
-        """
-        for template in self.list_all():
-            if template.trigger:
-                yield template
     
     def list_folders(self) -> List[str]:
         """List all category folders.

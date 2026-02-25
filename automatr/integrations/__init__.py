@@ -1,1 +1,1 @@
-"""Automatr integrations (LLM, Espanso, AutoHotkey)."""
+"""Automatr integrations (LLM runtime)."""
