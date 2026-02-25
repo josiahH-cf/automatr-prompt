@@ -3,16 +3,16 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "automatr"
+name = "automatr-prompt"
 version = "1.0.0"
-description = "Prompt templates + local LLM in one GUI. No cloud, no API keys."
+description = "Local prompt optimizer with reusable templates and llama.cpp integration. No cloud, no API keys."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
     {name = "Automatr Contributors"}
 ]
-keywords = ["llm", "prompt", "automation", "local", "llama.cpp", "espanso"]
+keywords = ["llm", "prompt", "templates", "local", "llama.cpp"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: X11 Applications :: Qt",
@@ -29,7 +29,6 @@ classifiers = [
 dependencies = [
     "PyQt6>=6.4.0",
     "requests>=2.28.0",
-    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -58,5 +57,7 @@ target-version = ["py310", "py311", "py312"]
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "N", "W"]
 ignore = ["E501"]
