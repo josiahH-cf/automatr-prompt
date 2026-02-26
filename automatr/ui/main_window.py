@@ -1,46 +1,35 @@
 """Main window for Automatr GUI."""
 
 import base64
-import shutil
 import sys
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QByteArray, QTimer, QRect
-from PyQt6.QtGui import QAction, QKeySequence, QDesktopServices, QShortcut, QWheelEvent, QFont, QCloseEvent, QGuiApplication
+from PyQt6.QtCore import Qt, QUrl, QByteArray
+from PyQt6.QtGui import (
+    QAction, QKeySequence, QDesktopServices, QShortcut,
+    QWheelEvent, QFont, QCloseEvent, QGuiApplication,
+)
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
     QHBoxLayout,
     QInputDialog,
     QLabel,
-    QLineEdit,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
-    QMenu,
-    QMenuBar,
     QMessageBox,
-    QPlainTextEdit,
     QProgressDialog,
     QPushButton,
     QSplitter,
     QStatusBar,
-    QTreeWidget,
-    QTreeWidgetItem,
-    QVBoxLayout,
     QWidget,
-    QFormLayout,
-    QScrollArea,
-    QFrame,
-    QTextEdit,
 )
 
 from automatr import __version__
 from automatr.core.config import get_config, save_config
 from automatr.core.feedback import get_feedback_manager
 from automatr.core.templates import Template, get_template_manager
-from automatr.integrations.llm import get_llm_client, get_llm_server
+from automatr.integrations.llm import get_llm_server
 from automatr.ui.theme import get_theme_stylesheet
 from automatr.ui.template_editor import TemplateEditor
 from automatr.ui.llm_settings import LLMSettingsDialog
@@ -48,136 +37,8 @@ from automatr.ui.template_improve import TemplateImproveDialog
 from automatr.ui.template_generate import GenerationPromptEditor, ImprovementPromptEditor
 from automatr.ui.template_tree import TemplateTreeWidget
 from automatr.ui.variable_form import VariableFormWidget
-
-
-class GenerationWorker(QThread):
-    """Background worker for LLM generation with retry on server startup."""
-    
-    finished = pyqtSignal(str)
-    error = pyqtSignal(str)
-    token_received = pyqtSignal(str)
-    # Emitted when waiting for server: (attempt, max_attempts)
-    waiting_for_server = pyqtSignal(int, int)
-    
-    # Retry settings for server startup scenarios
-    MAX_RETRY_ATTEMPTS = 3
-    RETRY_DELAY_SECONDS = 3.0
-    
-    def __init__(self, prompt: str, stream: bool = True):
-        super().__init__()
-        self.prompt = prompt
-        self.stream = stream
-        self._stopped = False
-    
-    def stop(self):
-        """Request generation to stop."""
-        self._stopped = True
-    
-    def _is_connection_error(self, error: Exception) -> bool:
-        """Check if error is a connection issue (server not ready)."""
-        error_str = str(error).lower()
-        return (
-            isinstance(error, ConnectionError)
-            or "cannot connect" in error_str
-            or "connection refused" in error_str
-            or "connection error" in error_str
-        )
-    
-    def run(self):
-        import time
-        client = get_llm_client()
-        last_error = None
-        
-        for attempt in range(1, self.MAX_RETRY_ATTEMPTS + 1):
-            if self._stopped:
-                return
-            
-            try:
-                if self.stream:
-                    result = []
-                    for token in client.generate_stream(self.prompt):
-                        if self._stopped:
-                            break
-                        result.append(token)
-                        self.token_received.emit(token)
-                    self.finished.emit("".join(result))
-                else:
-                    result = client.generate(self.prompt)
-                    self.finished.emit(result)
-                return  # Success, exit
-                
-            except Exception as e:
-                if self._stopped:
-                    return
-                
-                last_error = e
-                
-                # Only retry on connection errors (server starting)
-                if self._is_connection_error(e) and attempt < self.MAX_RETRY_ATTEMPTS:
-                    self.waiting_for_server.emit(attempt, self.MAX_RETRY_ATTEMPTS)
-                    time.sleep(self.RETRY_DELAY_SECONDS)
-                else:
-                    # Real error or exhausted retries
-                    break
-        
-        # All retries failed or non-connection error
-        if last_error and not self._stopped:
-            self.error.emit(str(last_error))
-
-
-class ModelCopyWorker(QThread):
-    """Background worker for copying model files with progress."""
-    
-    finished = pyqtSignal(bool, str)  # success, message or path
-    progress = pyqtSignal(int)  # percentage 0-100
-    
-    def __init__(self, source: Path, dest: Path):
-        super().__init__()
-        self.source = source
-        self.dest = dest
-        self._canceled = False
-    
-    def cancel(self):
-        """Request cancellation of the copy operation."""
-        self._canceled = True
-    
-    def run(self):
-        try:
-            total_size = self.source.stat().st_size
-            copied = 0
-            chunk_size = 1024 * 1024  # 1MB chunks
-            
-            with open(self.source, "rb") as src:
-                with open(self.dest, "wb") as dst:
-                    while True:
-                        if self._canceled:
-                            dst.close()
-                            if self.dest.exists():
-                                self.dest.unlink()
-                            self.finished.emit(False, "Copy canceled")
-                            return
-                        
-                        chunk = src.read(chunk_size)
-                        if not chunk:
-                            break
-                        dst.write(chunk)
-                        copied += len(chunk)
-                        percent = int((copied / total_size) * 100)
-                        self.progress.emit(percent)
-            
-            # Copy file metadata
-            shutil.copystat(self.source, self.dest)
-            self.finished.emit(True, str(self.dest))
-            
-        except PermissionError:
-            # Clean up partial file
-            if self.dest.exists():
-                self.dest.unlink()
-            self.finished.emit(False, f"Permission denied writing to:\n{self.dest.parent}")
-        except OSError as e:
-            if self.dest.exists():
-                self.dest.unlink()
-            self.finished.emit(False, f"Failed to copy file: {e}")
+from automatr.ui.output_pane import OutputPaneWidget
+from automatr.ui.workers import GenerationWorker, ModelCopyWorker
 
 
 class MainWindow(QMainWindow):
@@ -628,59 +489,14 @@ class MainWindow(QMainWindow):
             self._render_template_only
         )
         self.splitter.addWidget(self.variable_form)
-        
-        # Right panel: Output
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(5, 10, 10, 10)
-        
-        right_header = QHBoxLayout()
-        right_label = QLabel("Output")
-        right_label.setStyleSheet(f"font-weight: bold; font-size: {label_size}pt;")
-        right_header.addWidget(right_label)
-        right_header.addStretch()
-        
-        self.copy_btn = QPushButton("Copy")
-        self.copy_btn.setObjectName("secondary")
-        self.copy_btn.clicked.connect(self._copy_output)
-        right_header.addWidget(self.copy_btn)
-        
-        # Stop generation button (hidden by default)
-        self.stop_gen_btn = QPushButton("Stop")
-        self.stop_gen_btn.setObjectName("secondary")
-        self.stop_gen_btn.clicked.connect(self._stop_generation)
-        self.stop_gen_btn.setVisible(False)
-        right_header.addWidget(self.stop_gen_btn)
-        
-        # Generating indicator (hidden by default)
-        self.generating_label = QLabel("Generating...")
-        self.generating_label.setStyleSheet("color: #808080; font-style: italic;")
-        self.generating_label.setVisible(False)
-        right_header.addWidget(self.generating_label)
-        
-        # Timer for animated dots
-        self._gen_dot_count = 0
-        self._gen_timer = QTimer()
-        self._gen_timer.timeout.connect(self._update_generating_dots)
-        
-        clear_btn = QPushButton("Clear")
-        clear_btn.setObjectName("secondary")
-        clear_btn.clicked.connect(self._clear_output)
-        right_header.addWidget(clear_btn)
-        
-        right_layout.addLayout(right_header)
-        
-        self.output_text = QTextEdit()
-        self.output_text.setReadOnly(True)
-        self.output_text.setPlaceholderText(
-            "Generated output will appear here.\n\n"
-            "1. Select a template from the left\n"
-            "2. Fill in the variables\n"
-            "3. Click Generate"
+
+        # Right panel: Output pane widget
+        self.output_pane = OutputPaneWidget()
+        self.output_pane.stop_requested.connect(self._stop_generation)
+        self.output_pane.status_message.connect(
+            lambda msg, ms: self.status_bar.showMessage(msg, ms)
         )
-        right_layout.addWidget(self.output_text)
-        
-        self.splitter.addWidget(right_panel)
+        self.splitter.addWidget(self.output_pane)
         
         # Set initial splitter sizes from config
         config = get_config()
@@ -1072,14 +888,8 @@ class MainWindow(QMainWindow):
         # Disable generate button during generation
         self.variable_form.generate_btn.setEnabled(False)
         self.variable_form.generate_btn.setText("Generating...")
-        self.output_text.clear()
-        
-        # Show stop button and generating indicator
-        self.stop_gen_btn.setVisible(True)
-        self.generating_label.setVisible(True)
-        self._gen_dot_count = 0
-        self._waiting_for_server = False  # Track server waiting state
-        self._gen_timer.start(500)
+        self.output_pane.clear()
+        self.output_pane.set_streaming(True)
         
         # Store prompt for reference
         self._last_prompt = prompt
@@ -1087,10 +897,11 @@ class MainWindow(QMainWindow):
         
         # Start generation in background
         self.worker = GenerationWorker(prompt, stream=True)
-        self.worker.token_received.connect(self._on_token_received)
+        self.worker.token_received.connect(self.output_pane.append_text)
         self.worker.finished.connect(self._on_generation_finished)
         self.worker.error.connect(self._on_generation_error)
-        self.worker.waiting_for_server.connect(self._on_waiting_for_server)
+        self.worker.waiting_for_server.connect(self.output_pane.set_waiting_message)
+        self.worker.waiting_for_server.connect(self._on_waiting_for_server_status)
         self.worker.start()
     
     def _render_template_only(self):
@@ -1098,89 +909,40 @@ class MainWindow(QMainWindow):
         if not self.current_template:
             return
         
-        # Get variable values and render
         values = self.variable_form.get_values()
         rendered = self.current_template.render(values)
+        self.output_pane.set_text(rendered)
         
-        # Display in output
-        self.output_text.setPlainText(rendered)
-        
-        # Auto-copy to clipboard
         QApplication.clipboard().setText(rendered)
         self.status_bar.showMessage("Template copied to clipboard", 3000)
-    
-    def _on_token_received(self, token: str):
-        """Handle streaming token."""
-        # Clear waiting state on first token
-        if getattr(self, '_waiting_for_server', False):
-            self._waiting_for_server = False
-            self.generating_label.setText("Generating...")
-        cursor = self.output_text.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        cursor.insertText(token)
-        self.output_text.setTextCursor(cursor)
-        self.output_text.ensureCursorVisible()
     
     def _on_generation_finished(self, result: str):
         """Handle generation complete."""
         self.variable_form.generate_btn.setEnabled(True)
         self.variable_form.generate_btn.setText("Render with AI (Ctrl+G)")
+        self.output_pane.set_streaming(False)
         self.status_bar.showMessage("Generation complete", 3000)
-        
-        # Hide stop button and generating indicator
-        self._gen_timer.stop()
-        self.stop_gen_btn.setVisible(False)
-        self.generating_label.setVisible(False)
-        
-        # Store output for reference
         self._last_output = result
     
     def _on_generation_error(self, error: str):
         """Handle generation error."""
         self.variable_form.generate_btn.setEnabled(True)
         self.variable_form.generate_btn.setText("Render with AI (Ctrl+G)")
-        
-        # Hide stop button and generating indicator
-        self._gen_timer.stop()
-        self.stop_gen_btn.setVisible(False)
-        self.generating_label.setVisible(False)
-        
+        self.output_pane.set_streaming(False)
         QMessageBox.critical(self, "Generation Error", error)
     
-    def _on_waiting_for_server(self, attempt: int, max_attempts: int):
-        """Handle waiting for server to become ready."""
-        self._waiting_for_server = True
-        self.generating_label.setText(f"Model starting... (attempt {attempt}/{max_attempts})")
+    def _on_waiting_for_server_status(self, attempt: int, max_attempts: int):
+        """Update status bar when waiting for server."""
         self.status_bar.showMessage(
             f"Waiting for model to start (attempt {attempt}/{max_attempts})...", 
             5000
         )
-    
-    def _copy_output(self):
-        """Copy output to clipboard."""
-        text = self.output_text.toPlainText()
-        if text:
-            QApplication.clipboard().setText(text)
-            self.copy_btn.setText("Copied!")
-            QTimer.singleShot(2000, lambda: self.copy_btn.setText("Copy"))
     
     def _stop_generation(self):
         """Stop the current generation."""
         if self.worker and self.worker.isRunning():
             self.worker.stop()
             self.status_bar.showMessage("Generation stopped", 3000)
-    
-    def _update_generating_dots(self):
-        """Update the animated dots on the generating label."""
-        self._gen_dot_count = (self._gen_dot_count + 1) % 4
-        dots = "." * (self._gen_dot_count + 1)
-        # Don't overwrite "Model starting" message
-        if not getattr(self, '_waiting_for_server', False):
-            self.generating_label.setText(f"Generating{dots}")
-    
-    def _clear_output(self):
-        """Clear the output pane."""
-        self.output_text.clear()
 
 
 def run_gui() -> int:
