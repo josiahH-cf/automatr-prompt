@@ -1,8 +1,10 @@
 # Project
 
-- Project name: Automatr
-- Description: A local-model prompt workflow and prompt optimizer desktop app with reusable templates.
+- Project name: Automatr Prompt
+- Description: A local-model prompt optimizer desktop app with reusable templates and llama.cpp integration. No cloud, no API keys.
 - Primary language/framework: Python with PyQt6
+- Scope: Local prompt optimization, template management, llama.cpp LLM runtime
+- Non-goals: Espanso/text-expander integration, cloud LLM APIs, multi-tenant, mobile/web, PyPI publishing
 
 # Build
 
@@ -18,12 +20,21 @@
 
 - `automatr/`: Main Python package and app entrypoint.
 - `automatr/core/`: Core configuration, template handling, and user feedback utilities.
-- `automatr/integrations/`: External system integrations (LLM runtime, Espanso sync).
-- `automatr/ui/`: PyQt6 user interface screens and interaction flows.
+- `automatr/integrations/`: LLM runtime integration (llama.cpp server lifecycle, model management).
+- `automatr/ui/`: PyQt6 user interface — decomposed into focused widgets:
+  - `main_window.py`: Top-level window composing mixins for template actions, generation, and window state.
+  - `template_tree.py`: Sidebar tree for browsing and selecting templates.
+  - `template_editor.py`: Template content editor widget.
+  - `variable_form.py`: Form for filling template variables.
+  - `output_pane.py`: Generated text output display.
+  - `llm_toolbar.py`: Server controls and status display.
+  - `llm_settings.py`: LLM configuration dialog.
+  - `template_generate.py`, `template_improve.py`: Template generation and improvement dialogs.
+  - `theme.py`: Dark/light theme stylesheets.
+  - `workers.py`: Background QThread workers for generation and model operations.
 - `templates/`: Built-in prompt template JSON files shipped with the app.
 - `scripts/`: Repository utility scripts (maintenance and template tooling).
 - `.github/`: CI automation, issue/PR templates, and agent guidance files.
-- `.claude/` and `.codex/`: Agent tooling configuration, plans, and command definitions.
 - `workflow/`, `tasks/`, `specs/`, `decisions/`: Development lifecycle docs, execution plans, specs, and decision records.
 
 # Conventions
