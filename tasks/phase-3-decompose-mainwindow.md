@@ -5,8 +5,8 @@
 ## Status
 
 - Total: 6
-- Complete: 0
-- Remaining: 6
+- Complete: 6
+- Remaining: 0
 
 ## Prerequisites
 
@@ -19,42 +19,42 @@
 - **Files:** New: `automatr/ui/template_tree.py`. Modified: `automatr/ui/main_window.py`
 - **Done when:** A new `TemplateTreeWidget(QWidget)` class exists containing: tree view setup, context menu (edit, improve, version history, delete), folder operations, template selection signal, drag-and-drop (if any). `MainWindow` creates a `TemplateTreeWidget` instance instead of inline tree setup. All tree-related private methods moved out of `MainWindow`. Widget emits signals: `template_selected(Template)`, `template_deleted(str)`, `edit_requested(Template)`, `improve_requested(Template)`. File ≤300 lines. All existing tests pass
 - **Criteria covered:** AC-5
-- **Status:** [ ] Not started
+- **Status:** [x] Complete
 
 ### Task 2: Extract VariableFormWidget
 
 - **Files:** New: `automatr/ui/variable_form.py`. Modified: `automatr/ui/main_window.py`
 - **Done when:** A new `VariableFormWidget(QWidget)` class exists containing: dynamic form generation from `Template.variables`, value collection, form clearing, "Render with AI" and "Copy Template" buttons (or signals for them). `MainWindow` replaces inline variable panel setup with this widget. Widget provides: `get_values() -> dict`, `set_template(Template)`, signals for render/copy actions. File ≤300 lines. All existing tests pass
 - **Criteria covered:** AC-5
-- **Status:** [ ] Not started
+- **Status:** [x] Complete
 
 ### Task 3: Extract OutputPaneWidget
 
 - **Files:** New: `automatr/ui/output_pane.py`. Modified: `automatr/ui/main_window.py`
 - **Done when:** A new `OutputPaneWidget(QWidget)` class exists containing: text display area, copy/clear/stop buttons, streaming text append method, progress indication. `GenerationWorker` QThread either lives in this module or in a separate `automatr/ui/workers.py`. Widget provides: `append_text(str)`, `clear()`, `set_streaming(bool)`, signals: `stop_requested()`. File ≤300 lines. All existing tests pass
 - **Criteria covered:** AC-5
-- **Status:** [ ] Not started
+- **Status:** [x] Complete
 
 ### Task 4: Extract LLM toolbar/status widget
 
 - **Files:** New: `automatr/ui/llm_toolbar.py`. Modified: `automatr/ui/main_window.py`
 - **Done when:** A new `LLMToolbar(QWidget)` or `LLMStatusBar(QWidget)` class encapsulates: start/stop server buttons, status indicator (Connected/Not Running), model selection combo. Widget provides: `set_status(str)`, `set_models(list)`, signals: `start_requested()`, `stop_requested()`, `model_selected(str)`. `ModelCopyWorker` moves here or to `workers.py`. File ≤300 lines. All existing tests pass
 - **Criteria covered:** AC-5
-- **Status:** [ ] Not started
+- **Status:** [x] Complete
 
 ### Task 5: Slim down MainWindow to ≤300 lines
 
 - **Files:** `automatr/ui/main_window.py`
 - **Done when:** `MainWindow` is a thin shell that: (1) creates the 4 extracted widgets, (2) wires their signals together, (3) sets up menus (File, LLM, Help), (4) manages window state persistence (geometry, splitter sizes), (5) handles font scaling. Total file ≤300 lines. `run_gui()` still works. All existing tests pass
 - **Criteria covered:** AC-5
-- **Status:** [ ] Not started
+- **Status:** [x] Complete
 
 ### Task 6: Add widget-level tests
 
 - **Files:** `tests/test_widgets.py` (or split per widget)
 - **Done when:** Tests exist for: (1) `TemplateTreeWidget` populates from template list, emits `template_selected`, (2) `VariableFormWidget` generates correct form fields from template variables, `get_values()` returns entered values, (3) `OutputPaneWidget` appends text correctly, emits `stop_requested`. Minimum 6 test functions. Uses `pytest-qt` `qtbot` for widget testing. All tests pass
 - **Criteria covered:** AC-5, AC-4
-- **Status:** [ ] Not started
+- **Status:** [x] Complete
 
 ## Test Strategy
 
