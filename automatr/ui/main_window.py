@@ -214,9 +214,8 @@ class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainW
             "<p>Minimal prompt automation with local LLM.</p>"
             "<p><b>Features:</b></p><ul>"
             "<li>Template-driven prompts</li>"
-            "<li>Local llama.cpp integration</li>"
-            "<li>Espanso text expansion</li></ul>"
-            "<p><a href='https://github.com/yourname/automatr'>GitHub</a></p>",
+            "<li>Local llama.cpp integration</li></ul>"
+            "<p><a href='https://github.com/josiahH-cf/automatr-prompt'>GitHub</a></p>",
         )
 
     def _setup_ui(self):

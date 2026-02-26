@@ -82,7 +82,7 @@ class Template:
     name: str
     content: str
     description: str = ""
-    trigger: str = ""  # Espanso trigger (e.g., ":review")
+    trigger: str = ""  # External trigger alias (e.g., ":review")
     variables: List[Variable] = field(default_factory=list)
     refinements: List[str] = field(default_factory=list)  # User feedback for template improvement
     
@@ -518,7 +518,7 @@ class TemplateManager:
             name: Template name.
             content: Template content with {{variable}} placeholders.
             description: Optional description.
-            trigger: Optional Espanso trigger.
+            trigger: Optional external trigger alias.
             variables: Optional list of variable dicts.
             
         Returns:
