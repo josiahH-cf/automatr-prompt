@@ -2,7 +2,7 @@
 
 import base64
 
-from PyQt6.QtCore import Qt, QByteArray
+from PyQt6.QtCore import QByteArray, Qt
 from PyQt6.QtGui import QCloseEvent, QGuiApplication
 
 from automatr.core.config import get_config, save_config
@@ -69,7 +69,7 @@ class WindowStateMixin:
         if config.ui.last_template:
             self._select_template_in_tree(config.ui.last_template)
 
-    def closeEvent(self, event: QCloseEvent):
+    def closeEvent(self, event: QCloseEvent):  # noqa: N802
         """Save window and app state when closing."""
         config = get_config()
 

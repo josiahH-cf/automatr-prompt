@@ -5,8 +5,11 @@ from typing import Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import (
-    QAction, QKeySequence, QShortcut,
-    QWheelEvent, QFont,
+    QAction,
+    QFont,
+    QKeySequence,
+    QShortcut,
+    QWheelEvent,
 )
 from PyQt6.QtWidgets import (
     QApplication,
@@ -22,16 +25,16 @@ from PyQt6.QtWidgets import (
 from automatr import __version__
 from automatr.core.config import get_config, save_config
 from automatr.core.templates import Template
-from automatr.ui.theme import get_theme_stylesheet
-from automatr.ui.llm_settings import LLMSettingsDialog
-from automatr.ui.template_tree import TemplateTreeWidget
-from automatr.ui.variable_form import VariableFormWidget
-from automatr.ui.output_pane import OutputPaneWidget
-from automatr.ui.llm_toolbar import LLMToolbar
-from automatr.ui.workers import GenerationWorker
-from automatr.ui._template_actions import TemplateActionsMixin
 from automatr.ui._generation import GenerationMixin
+from automatr.ui._template_actions import TemplateActionsMixin
 from automatr.ui._window_state import WindowStateMixin
+from automatr.ui.llm_settings import LLMSettingsDialog
+from automatr.ui.llm_toolbar import LLMToolbar
+from automatr.ui.output_pane import OutputPaneWidget
+from automatr.ui.template_tree import TemplateTreeWidget
+from automatr.ui.theme import get_theme_stylesheet
+from automatr.ui.variable_form import VariableFormWidget
+from automatr.ui.workers import GenerationWorker
 
 
 class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainWindow):
@@ -41,17 +44,17 @@ class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainW
         super().__init__()
         self.setWindowTitle(f"Automatr v{__version__}")
         self.setMinimumSize(600, 400)  # Allow proper window snapping on all screen sizes
-        
+
         config = get_config()
         self.resize(config.ui.window_width, config.ui.window_height)
-        
+
         self.current_template: Optional[Template] = None
         self.worker: Optional[GenerationWorker] = None
-        
+
         # Feedback tracking - stores last AI generation for feedback
         self._last_prompt: Optional[str] = None
         self._last_output: Optional[str] = None
-        
+
         self._setup_menu_bar()
         self._setup_ui()
         self._setup_status_bar()
@@ -154,15 +157,15 @@ class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainW
         about_action = QAction("&About Automatr", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
-    
+
     def _setup_shortcuts(self):
         """Set up additional keyboard shortcuts."""
         QShortcut(QKeySequence("Ctrl++"), self).activated.connect(self._increase_font)
         QShortcut(QKeySequence("Ctrl+="), self).activated.connect(self._increase_font)
         QShortcut(QKeySequence("Ctrl+-"), self).activated.connect(self._decrease_font)
         QShortcut(QKeySequence("Ctrl+0"), self).activated.connect(self._reset_font)
-    
-    def wheelEvent(self, event: QWheelEvent):
+
+    def wheelEvent(self, event: QWheelEvent):  # noqa: N802
         """Handle mouse wheel events for font scaling with Ctrl."""
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             delta = event.angleDelta().y()
@@ -173,7 +176,7 @@ class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainW
             event.accept()
         else:
             super().wheelEvent(event)
-    
+
     def _apply_font_size(self, size: int):
         """Apply a new font size to the application."""
         size = max(8, min(24, size))
@@ -190,7 +193,7 @@ class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainW
             if label.text() in ("Templates", "Variables", "Output"):
                 label.setStyleSheet(label_style)
         self.status_bar.showMessage(f"Font size: {size}pt", 2000)
-    
+
     def _increase_font(self):
         """Increase font size by 1pt."""
         self._apply_font_size(get_config().ui.font_size + 1)
@@ -202,7 +205,7 @@ class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainW
     def _reset_font(self):
         """Reset font size to default (13pt)."""
         self._apply_font_size(13)
-    
+
     def _show_about(self):
         """Show the about dialog."""
         QMessageBox.about(
@@ -215,7 +218,7 @@ class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainW
             "<li>Espanso text expansion</li></ul>"
             "<p><a href='https://github.com/yourname/automatr'>GitHub</a></p>",
         )
-    
+
     def _setup_ui(self):
         """Set up the main UI."""
         central = QWidget()
@@ -243,7 +246,7 @@ class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainW
         config = get_config()
         self.splitter.setSizes(config.ui.splitter_sizes)
         main_layout.addWidget(self.splitter)
-    
+
     def _setup_status_bar(self):
         """Set up the status bar with the LLM toolbar."""
         self.status_bar = QStatusBar()
@@ -275,21 +278,21 @@ class MainWindow(TemplateActionsMixin, GenerationMixin, WindowStateMixin, QMainW
 
 def run_gui() -> int:
     """Run the GUI application.
-    
+
     Returns:
         Exit code.
     """
     app = QApplication(sys.argv)
     app.setApplicationName("Automatr")
     app.setApplicationVersion(__version__)
-    
+
     # Apply theme with font size
     config = get_config()
     stylesheet = get_theme_stylesheet(config.ui.theme, config.ui.font_size)
     app.setStyleSheet(stylesheet)
     app.setFont(QFont(app.font().family(), config.ui.font_size))
-    
+
     window = MainWindow()
     window.show()
-    
+
     return app.exec()

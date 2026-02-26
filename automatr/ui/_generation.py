@@ -1,6 +1,5 @@
 """Mixin providing LLM generation orchestration for MainWindow."""
 
-from typing import Optional
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
 

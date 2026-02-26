@@ -8,8 +8,11 @@ from automatr.core.config import get_config, save_config
 from automatr.core.templates import Template, get_template_manager
 from automatr.integrations.llm import get_llm_server
 from automatr.ui.template_editor import TemplateEditor
+from automatr.ui.template_generate import (
+    GenerationPromptEditor,
+    ImprovementPromptEditor,
+)
 from automatr.ui.template_improve import TemplateImproveDialog
-from automatr.ui.template_generate import GenerationPromptEditor, ImprovementPromptEditor
 
 
 class TemplateActionsMixin:
