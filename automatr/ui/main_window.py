@@ -46,6 +46,7 @@ from automatr.ui.template_editor import TemplateEditor
 from automatr.ui.llm_settings import LLMSettingsDialog
 from automatr.ui.template_improve import TemplateImproveDialog
 from automatr.ui.template_generate import GenerationPromptEditor, ImprovementPromptEditor
+from automatr.ui.template_tree import TemplateTreeWidget
 
 
 class GenerationWorker(QThread):
@@ -277,10 +278,48 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_status_bar()
         self._setup_shortcuts()
-        self._load_templates()
+        self._wire_tree_signals()
+        self.template_tree_widget.load_templates()
         self._restore_state()
         self._check_llm_status()
-    
+
+    def _wire_tree_signals(self):
+        """Connect TemplateTreeWidget signals to MainWindow slots."""
+        tree = self.template_tree_widget
+        tree.template_selected.connect(self._on_template_selected)
+        tree.folder_selected.connect(self._on_folder_selected)
+        tree.edit_requested.connect(lambda t: self._edit_template(t))
+        tree.improve_requested.connect(lambda t: self._improve_template(t))
+        tree.version_history_requested.connect(
+            lambda t: self._show_version_history(t)
+        )
+        tree.new_template_requested.connect(self._new_template)
+        tree.template_deleted.connect(self._on_template_deleted)
+        tree.status_message.connect(
+            lambda msg, ms: self.status_bar.showMessage(msg, ms)
+        )
+
+    def _on_template_selected(self, template: Template):
+        """Handle template selection from tree widget."""
+        self.current_template = template
+        self.variable_form.set_template(template)
+        self.generate_btn.setEnabled(True)
+        self.render_template_btn.setEnabled(True)
+
+    def _on_folder_selected(self):
+        """Handle folder selection (deselect template)."""
+        self.current_template = None
+        self.variable_form.clear()
+        self.generate_btn.setEnabled(False)
+        self.render_template_btn.setEnabled(False)
+
+    def _on_template_deleted(self, name: str):
+        """Handle template deletion from tree widget."""
+        self.current_template = None
+        self.variable_form.clear()
+        self.generate_btn.setEnabled(False)
+        self.render_template_btn.setEnabled(False)
+
     def _setup_menu_bar(self):
         """Set up the menu bar."""
         menubar = self.menuBar()
@@ -655,63 +694,19 @@ class MainWindow(QMainWindow):
         
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Left panel: Template list
-        left_panel = QWidget()
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(10, 10, 5, 10)
-        
-        left_header = QHBoxLayout()
-        left_label = QLabel("Templates")
-        config = get_config()
-        label_size = config.ui.font_size + 1
-        left_label.setStyleSheet(f"font-weight: bold; font-size: {label_size}pt;")
-        left_header.addWidget(left_label)
-        
-        new_folder_btn = QPushButton("📁")
-        new_folder_btn.setMaximumWidth(30)
-        new_folder_btn.setToolTip("Create new folder")
-        new_folder_btn.clicked.connect(self._new_folder)
-        left_header.addWidget(new_folder_btn)
-        
-        new_btn = QPushButton("+")
-        new_btn.setMaximumWidth(30)
-        new_btn.setToolTip("Create new template")
-        new_btn.clicked.connect(self._new_template)
-        left_header.addWidget(new_btn)
-        
-        left_layout.addLayout(left_header)
-        
-        self.template_tree = QTreeWidget()
-        self.template_tree.setHeaderHidden(True)
-        self.template_tree.itemClicked.connect(self._on_tree_item_clicked)
-        self.template_tree.itemDoubleClicked.connect(self._on_tree_item_double_clicked)
-        # Enable context menu
-        self.template_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.template_tree.customContextMenuRequested.connect(self._show_template_context_menu)
-        left_layout.addWidget(self.template_tree)
-        
-        # Template action buttons
-        template_actions = QHBoxLayout()
-        
-        edit_btn = QPushButton("Edit")
-        edit_btn.setObjectName("secondary")
-        edit_btn.clicked.connect(self._edit_template)
-        template_actions.addWidget(edit_btn)
-        
-        delete_btn = QPushButton("Delete")
-        delete_btn.setObjectName("danger")
-        delete_btn.clicked.connect(self._delete_selected)
-        template_actions.addWidget(delete_btn)
-        
-        left_layout.addLayout(template_actions)
-        
-        self.splitter.addWidget(left_panel)
+        # Left panel: Template tree widget
+        self.template_tree_widget = TemplateTreeWidget()
+        # Alias for backwards compat with state save/restore
+        self.template_tree = self.template_tree_widget.tree
+        self.splitter.addWidget(self.template_tree_widget)
         
         # Middle panel: Variables
         middle_panel = QWidget()
         middle_layout = QVBoxLayout(middle_panel)
         middle_layout.setContentsMargins(5, 10, 5, 10)
-        
+
+        config = get_config()
+        label_size = config.ui.font_size + 1
         middle_label = QLabel("Variables")
         middle_label.setStyleSheet(f"font-weight: bold; font-size: {label_size}pt;")
         middle_layout.addWidget(middle_label)
@@ -919,166 +914,6 @@ class MainWindow(QMainWindow):
         save_config(config)
         event.accept()
     
-    def _load_templates(self):
-        """Load templates from disk, grouped by folder."""
-        self.template_tree.clear()
-        manager = get_template_manager()
-        
-        # Get all templates and organize by folder
-        templates_by_folder: dict[str, list[Template]] = {"": []}  # "" = root/uncategorized
-        
-        for folder in manager.list_folders():
-            templates_by_folder[folder] = []
-        
-        for template in manager.list_all():
-            folder = manager.get_template_folder(template)
-            if folder not in templates_by_folder:
-                templates_by_folder[folder] = []
-            templates_by_folder[folder].append(template)
-        
-        total_count = 0
-        
-        # Add uncategorized templates first (root level)
-        for template in sorted(templates_by_folder.get("", []), key=lambda t: t.name.lower()):
-            item = QTreeWidgetItem([template.name])
-            item.setData(0, Qt.ItemDataRole.UserRole, ("template", template))
-            if template.description:
-                item.setToolTip(0, template.description)
-            self.template_tree.addTopLevelItem(item)
-            total_count += 1
-        
-        # Add folders with their templates
-        for folder in sorted(templates_by_folder.keys()):
-            if folder == "":
-                continue  # Already handled uncategorized
-            
-            folder_item = QTreeWidgetItem([f"📁 {folder}"])
-            folder_item.setData(0, Qt.ItemDataRole.UserRole, ("folder", folder))
-            folder_item.setExpanded(True)
-            
-            folder_templates = templates_by_folder[folder]
-            if not folder_templates:
-                folder_item.setToolTip(0, "Empty folder")
-            
-            for template in sorted(folder_templates, key=lambda t: t.name.lower()):
-                child = QTreeWidgetItem([template.name])
-                child.setData(0, Qt.ItemDataRole.UserRole, ("template", template))
-                if template.description:
-                    child.setToolTip(0, template.description)
-                folder_item.addChild(child)
-                total_count += 1
-            
-            self.template_tree.addTopLevelItem(folder_item)
-        
-        self.status_bar.showMessage(f"Loaded {total_count} templates", 3000)
-    
-    def _refresh_templates(self):
-        """Refresh the template list (alias for _load_templates)."""
-        self._load_templates()
-    
-    def _load_template(self, template: Template):
-        """Load a specific template into the variable form."""
-        self.variable_form.set_template(template)
-    
-    def _on_tree_item_clicked(self, item: QTreeWidgetItem, column: int):
-        """Handle tree item single click."""
-        data = item.data(0, Qt.ItemDataRole.UserRole)
-        if data and data[0] == "template":
-            template = data[1]
-            self.current_template = template
-            self.variable_form.set_template(template)
-            self.generate_btn.setEnabled(True)
-            self.render_template_btn.setEnabled(True)
-        else:
-            # Folder clicked - clear selection
-            self.current_template = None
-            self.variable_form.clear()
-            self.generate_btn.setEnabled(False)
-            self.render_template_btn.setEnabled(False)
-    
-    def _on_tree_item_double_clicked(self, item: QTreeWidgetItem, column: int):
-        """Handle tree item double click."""
-        data = item.data(0, Qt.ItemDataRole.UserRole)
-        if data and data[0] == "template":
-            self._edit_template()
-    
-    def _show_template_context_menu(self, position):
-        """Show context menu for template tree items."""
-        item = self.template_tree.itemAt(position)
-        if not item:
-            return
-        
-        data = item.data(0, Qt.ItemDataRole.UserRole)
-        if not data:
-            return
-        
-        menu = QMenu(self)
-        
-        if data[0] == "template":
-            template = data[1]
-            
-            # Edit action
-            edit_action = menu.addAction("Edit Template")
-            edit_action.triggered.connect(self._edit_template)
-            
-            # Improve action
-            improve_action = menu.addAction("Improve Template...")
-            improve_action.triggered.connect(self._improve_template)
-            
-            # Version history action (only if versions exist)
-            manager = get_template_manager()
-            versions = manager.list_versions(template)
-            if versions:
-                history_action = menu.addAction(f"Version History ({len(versions)})...")
-                history_action.triggered.connect(self._show_version_history)
-            
-            menu.addSeparator()
-            
-            # Delete action
-            delete_action = menu.addAction("Delete Template")
-            delete_action.triggered.connect(self._delete_template)
-        
-        elif data[0] == "folder":
-            # Folder context menu
-            delete_action = menu.addAction("Delete Folder")
-            delete_action.triggered.connect(self._delete_selected)
-        
-        menu.exec(self.template_tree.mapToGlobal(position))
-
-    def _new_folder(self):
-        """Create a new template folder."""
-        name, ok = QInputDialog.getText(
-            self,
-            "New Folder",
-            "Enter folder name:",
-        )
-        if ok and name.strip():
-            manager = get_template_manager()
-            if manager.create_folder(name.strip()):
-                self._load_templates()
-                self.status_bar.showMessage(f"Created folder '{name.strip()}'", 3000)
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Error",
-                    f"Could not create folder '{name.strip()}'. It may already exist or contain invalid characters.",
-                )
-    
-    def _delete_selected(self):
-        """Delete the selected item (template or folder)."""
-        item = self.template_tree.currentItem()
-        if not item:
-            return
-        
-        data = item.data(0, Qt.ItemDataRole.UserRole)
-        if not data:
-            return
-        
-        if data[0] == "template":
-            self._delete_template()
-        elif data[0] == "folder":
-            self._delete_folder(data[1])
-    
     def _check_llm_status(self):
         """Check if the LLM server is running and update UI."""
         server = get_llm_server()
@@ -1142,21 +977,23 @@ class MainWindow(QMainWindow):
         config.ui.last_editor_folder = dialog.folder_combo.currentData() or ""
         save_config(config)
     
-    def _edit_template(self):
-        """Edit the selected template."""
-        if not self.current_template:
+    def _edit_template(self, template: Optional[Template] = None):
+        """Edit the given or currently selected template."""
+        target = template or self.current_template
+        if not target:
             return
-        
-        dialog = TemplateEditor(self.current_template, parent=self)
+
+        dialog = TemplateEditor(target, parent=self)
         dialog.template_saved.connect(self._on_template_saved)
         dialog.exec()
     
-    def _improve_template(self):
+    def _improve_template(self, template: Optional[Template] = None):
         """Improve the selected template using AI based on user feedback.
-        
+
         Prompts user for feedback first, then generates improvements.
         """
-        if not self.current_template:
+        target = template or self.current_template
+        if not target:
             return
         
         # Prompt for feedback first
@@ -1191,7 +1028,7 @@ class MainWindow(QMainWindow):
         
         # Show improvement dialog with feedback
         dialog = TemplateImproveDialog(
-            self.current_template, 
+            target,
             initial_feedback=feedback.strip() if feedback else "",
             parent=self
         )
@@ -1218,19 +1055,19 @@ class MainWindow(QMainWindow):
         folder = manager.get_template_folder(self.current_template)
         if manager.save_to_folder(self.current_template, folder):
             self.status_bar.showMessage("Template improved and saved", 3000)
-            self._refresh_templates()
-            # Re-select the template to update the UI
-            self._load_template(self.current_template)
+            self.template_tree_widget.refresh()
+            self.variable_form.set_template(self.current_template)
         else:
             QMessageBox.critical(self, "Error", "Failed to save improved template")
 
-    def _show_version_history(self):
-        """Show version history dialog for the current template."""
-        if not self.current_template:
+    def _show_version_history(self, template: Optional[Template] = None):
+        """Show version history dialog for the given or current template."""
+        target = template or self.current_template
+        if not target:
             return
-        
+
         manager = get_template_manager()
-        versions = manager.list_versions(self.current_template)
+        versions = manager.list_versions(target)
         
         if not versions:
             QMessageBox.information(
@@ -1255,7 +1092,7 @@ class MainWindow(QMainWindow):
         item, ok = QInputDialog.getItem(
             self,
             "Revert Template",
-            f"Select a version to revert '{self.current_template.name}' to:",
+            f"Select a version to revert '{target.name}' to:",
             items,
             0,  # Default to most recent
             False,  # Not editable
@@ -1283,88 +1120,26 @@ class MainWindow(QMainWindow):
         
         # Perform revert
         restored = manager.restore_version(
-            self.current_template, 
+            target,
             selected_version.version,
             create_backup=True
         )
-        
+
         if restored:
             self.current_template = restored
-            self._refresh_templates()
-            self._load_template(self.current_template)
+            self.template_tree_widget.refresh()
+            self.variable_form.set_template(self.current_template)
             self.status_bar.showMessage(
                 f"Reverted to version {selected_version.version}", 3000
             )
         else:
             QMessageBox.critical(self, "Error", "Failed to revert template")
-    
-    def _delete_template(self):
-        """Delete the selected template."""
-        if not self.current_template:
-            return
-        
-        reply = QMessageBox.question(
-            self,
-            "Delete Template",
-            f"Are you sure you want to delete '{self.current_template.name}'?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            manager = get_template_manager()
 
-            if manager.delete(self.current_template):
-                self.current_template = None
-                self.variable_form.clear()
-                self.generate_btn.setEnabled(False)
-                self.render_template_btn.setEnabled(False)
-                self._load_templates()
-                self.status_bar.showMessage("Template deleted", 3000)
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Delete Failed",
-                    f"Failed to delete template '{self.current_template.name}'."
-                )
-    
     def _on_template_saved(self, template: Template):
         """Handle template saved signal."""
-        self._load_templates()
-        # Re-select the saved template in tree
-        self._select_template_in_tree(template.name)
-        
-    def _select_template_in_tree(self, template_name: str):
-        """Select a template in the tree by name."""
-        def find_in_item(item: QTreeWidgetItem) -> bool:
-            data = item.data(0, Qt.ItemDataRole.UserRole)
-            if data and data[0] == "template" and data[1].name == template_name:
-                self.template_tree.setCurrentItem(item)
-                self._on_tree_item_clicked(item, 0)
-                return True
-            for i in range(item.childCount()):
-                if find_in_item(item.child(i)):
-                    return True
-            return False
-        
-        for i in range(self.template_tree.topLevelItemCount()):
-            if find_in_item(self.template_tree.topLevelItem(i)):
-                break
-    
-    def _delete_folder(self, folder_name: str):
-        """Delete a template folder."""
-        manager = get_template_manager()
-        success, error_msg = manager.delete_folder(folder_name)
-        
-        if success:
-            self._load_templates()
-            self.status_bar.showMessage(f"Deleted folder '{folder_name}'", 3000)
-        else:
-            QMessageBox.warning(
-                self,
-                "Cannot Delete Folder",
-                error_msg,
-            )
-    
+        self.template_tree_widget.load_templates()
+        self.template_tree_widget.select_template_by_name(template.name)
+
     def _generate(self):
         """Generate output using the LLM."""
         if not self.current_template:
