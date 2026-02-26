@@ -18,6 +18,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libxkbcommon0 libxcb-cursor0
+
       - name: Setup language runtime
         uses: actions/setup-python@v5
         with:
@@ -31,4 +36,4 @@ jobs:
       - name: Validate environment
         run: |
           ruff check .
-          pytest
+          QT_QPA_PLATFORM=offscreen pytest
