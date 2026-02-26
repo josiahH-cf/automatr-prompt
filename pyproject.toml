@@ -43,8 +43,8 @@ dev = [
 automatr = "automatr.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/josiahH-cf/automatr"
-Repository = "https://github.com/josiahH-cf/automatr"
+Homepage = "https://github.com/josiahH-cf/automatr-prompt"
+Repository = "https://github.com/josiahH-cf/automatr-prompt"
 
 [tool.setuptools.packages.find]
 where = ["."]
