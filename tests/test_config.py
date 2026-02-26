@@ -2,12 +2,7 @@
 
 Covers: default config creation when no file exists, loading existing config.json,
 saving config and verifying JSON output, update() with dotted keys (e.g. llm.model_path),
-backward-compat behaviour with unknown top-level JSON keys, and platform detection.
-
-NOTE (bug documented): Config.from_dict() passes **llm_data / **ui_data directly to
-the dataclass constructors. Unknown nested keys inside the 'llm' or 'ui' sections
-cause a TypeError. See test_load_config_with_unknown_nested_keys_raises for details.
-This is a pre-existing production bug; not fixed in this phase.
+backward-compat behaviour with unknown top-level and nested JSON keys, and platform detection.
 """
 
 import json
@@ -172,25 +167,26 @@ def test_load_config_with_unknown_top_level_keys(tmp_path: Path) -> None:
     assert config.ui.theme == "dark"
 
 
-def test_load_config_with_unknown_nested_keys_raises(tmp_path: Path) -> None:
-    """BUG (documented): unknown keys inside 'llm' or 'ui' sections cause TypeError.
-
-    Config.from_dict() passes **data directly to LLMConfig() / UIConfig(), so
-    extra nested keys are not silently ignored — they raise TypeError.
-    This is a pre-existing production bug that should be fixed separately.
-    """
+def test_from_dict_ignores_unknown_llm_nested_keys() -> None:
+    """Config.from_dict() silently ignores unknown keys inside the 'llm' section."""
     data = {
-        "llm": {"server_port": 8080, "future_llm_field": "oops"},
+        "llm": {"server_port": 9090, "future_llm_field": "oops"},
         "ui": {"theme": "dark"},
     }
-    config_path = tmp_path / "nested_unknown.json"
-    config_path.write_text(json.dumps(data), encoding="utf-8")
+    config = Config.from_dict(data)
+    assert config.llm.server_port == 9090
+    assert config.ui.theme == "dark"
 
-    mgr = ConfigManager(config_path=config_path)
-    # ConfigManager.load() catches TypeError and returns defaults — verify it survives
-    config = mgr.load()
-    # Behaviour: falls back to default Config() because the error is caught
-    assert isinstance(config, Config)
+
+def test_from_dict_ignores_unknown_ui_nested_keys() -> None:
+    """Config.from_dict() silently ignores unknown keys inside the 'ui' section."""
+    data = {
+        "llm": {"server_port": 8080},
+        "ui": {"theme": "light", "future_ui_widget": True},
+    }
+    config = Config.from_dict(data)
+    assert config.llm.server_port == 8080
+    assert config.ui.theme == "light"
 
 
 # ---------------------------------------------------------------------------
